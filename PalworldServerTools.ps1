@@ -1450,6 +1450,14 @@ if ($true -eq $Start -or $true -eq $StartThemed){
 	}
 	LaunchServer
 }
+if ($true -eq $CheckStart){
+	WriteLog -info -noconsole "Initialisation: Parameter supplied to start Server."
+	if ($true -ne $noUpdate){#update server unless it was specified not to at launch
+		WriteLog -info -noconsole "Initialisation: Checking for updates as part of launch process."
+		UpdateCheck
+	}
+	CheckServerStart
+}
 if ($True -eq $RCONParamsUsed){
 	RCON_Logic
 	ExitCheck
