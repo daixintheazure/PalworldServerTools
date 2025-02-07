@@ -28,7 +28,7 @@ Changes since 1.1.0 (next version edits):
 ##########################################################################################################
 param(
 	[switch]$Info,[switch]$Version,[switch]$ServerName,[switch]$ShowPlayers,[switch]$ShowPlayersNoHeader,[switch]$ShowPlayerNames,[switch]$ShowPlayerCount,[switch]$LogPlayers,[switch]$Shutdown,[int]$ShutdownTimer,$ShutdownMessage,[string]$Broadcast,[switch]$DoExit,[switch]$Save,
-	[string]$KickPlayer,[string]$BanPlayer,$ServerPath,$ThemeSettingsPath,$LaunchParameters,$HostIP,$RCONPort,$RCONPass,[switch]$UpdateOnly,[switch]$UpdateCheck,[switch]$NoUpdate,[switch]$Start,[switch]$StartThemed,[switch]$TodaysTheme,[Switch]$NoLogging,[switch]$Setup,[Switch]$Backup,[switch]$debug
+	[string]$KickPlayer,[string]$BanPlayer,$ServerPath,$ThemeSettingsPath,$LaunchParameters,$HostIP,$RCONPort,$RCONPass,[switch]$UpdateOnly,[switch]$UpdateCheck,[switch]$NoUpdate,[switch]$Start,[switch]$CheckStart,[switch]$StartThemed,[switch]$TodaysTheme,[Switch]$NoLogging,[switch]$Setup,[Switch]$Backup,[switch]$debug
 )
 $ScriptVersion = "1.1.1"
 
@@ -390,6 +390,92 @@ Function LaunchServer {
 	if ($null -ne (Get-Process | Where-Object {$_.processname -match "palserver"})){
 		WriteLog -info -noconsole "LaunchServer: Server is currently running"
 		RCON_ShutdownRestartNotifier -Restart
+	}
+	if ($False -eq $UpdateOnly) {
+		if (-not $Config.NormalSettingsName.EndsWith(".ini")){#add .ini to value if it wasn't specified in config.
+			$Config.NormalSettingsName = $Config.NormalSettingsName + ".ini"
+		}
+		$Config.NormalSettingsName = $Config.NormalSettingsName.tostring()
+		if ((Test-Path -Path ($ThemeSettingsPath + $Config.NormalSettingsName)) -ne $true){#if file doesn't exist
+				WriteLog -warning -noconsole "LaunchServer: "
+				WriteLog -warning -nonewline ($Config.NormalSettingsName + " doesn't exist, copying current config to $ThemeSettingsPath" + $Config.NormalSettingsName)
+				Copy-Item "$ServerPath\Pal\Saved\Config\WindowsServer\PalWorldSettings.ini" "$ThemeSettingsPath$($Config.NormalSettingsName)" #$ServerPath\Pal\Saved\Config\WindowsServer\CustomSettings\
+		}
+		if ($True -ne $Start){
+			WriteLog -info -noconsole "LaunchServer: "
+			WriteLog -info -nonewline "Starting Palworld Server with Theme Config"
+			$iniFiles = Get-ChildItem -Path $ThemeSettingsPath -Filter *.ini
+			$Script:AllConfigOptions = @{}
+			foreach ($file in $iniFiles) {
+				$Script:AllConfigOptions[($file.Name).replace(".txt","")] = $file.FullName
+			}
+			$currentDay = (Get-Date -Format "dddd") #;$currentday = (Get-Date).AddDays(-3).ToString("dddd") #for testing theme on previous days
+			#Validation
+			$daysOfWeek = @("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+			foreach ($day in $daysOfWeek) {
+				$IniName = $Config.$day
+				if ($Script:AllConfigOptions.ContainsKey("$IniName.ini")) {
+					WriteLog -success -noconsole "LaunchServer: "
+					WriteLog -success -nonewline "The filename specified for $Day is correct: (`"$IniName.ini`")"
+				}
+				Else {
+					WriteLog -errorlog -noconsole "LaunchServer: "
+					WriteLog -errorlog -nonewline "The filename for $Day is incorrect as it doesn't match config in the xml." 
+					WriteLog -errorlog -newline ("Either edit the config or ensure there's a file called " + $IniName + ".ini") 
+					write-host
+					$ErrorCount ++
+				}
+			}
+			if ($ErrorCount -ge 1){
+				$Plural = "these"
+				if ($ErrorCount -eq 1){
+					$Plural = "this"
+				}
+				WriteLog -errorlog -newline "Correct $Plural and rerun the script. Script will now exit."
+				ExitCheck
+			}
+			$SettingsActual = ($ServerPath +"\Pal\Saved\Config\WindowsServer\PalWorldSettings.ini")
+			$AllConfigOptionsObject = @()
+			foreach ($key in $Script:AllConfigOptions.Keys) {# Adding key-value pairs to the variable
+				$value = $AllConfigOptions[$key]
+				$entry = [PSCustomObject]@{
+					Name  = $key
+					Value = $value
+				}
+				$AllConfigOptionsObject += $entry
+			}
+			$GameSettings = $AllConfigOptionsObject | where-object {$_.Name -match $Config.$currentday}
+			$TodaysTheme = $GameSettings.Name.replace("_"," ").replace(".ini","")
+			$TodaysTheme | Out-File -FilePath "$WorkingDirectory\TodaysTheme.txt"
+			Copy-Item $GameSettings.Value $SettingsActual
+			WriteLog -success -noconsole "LaunchServer: "
+			WriteLog -success -nonewline ("Copied `"" + $TodaysTheme + "`" Settings to PalWorldSettings.ini")
+		}
+		Else {
+			Copy-Item ($ThemeSettingsPath + $Config.NormalSettingsName) ($Script:ServerPath + "\Pal\Saved\Config\WindowsServer\PalWorldSettings.ini")
+			WriteLog -success -noconsole "LaunchServer: "
+			WriteLog -success -nonewline "Copied $($Config.NormalSettingsName) to PalWorldSettings.ini"
+		}
+		If ($True -eq $Config.CommunityServer){
+			WriteLog -verbose "LaunchServer: Community is enabled."
+			$Community = "EpicApp=PalServer"
+		}
+		Else {
+			$Community = ""
+		}
+		if ($Null -eq $LaunchParameters -or $LaunchParameters -eq ""){
+			WriteLog -verbose "LaunchServer: Standard Launch Parameters used"
+			$LaunchParameters = "$Community -log -publicip=$HostIP -publicport=$GamePort -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS"
+		}
+		Start-Process ($Script:ServerPath + "\PalServer.exe") $LaunchParameters
+		Write-Host
+		WriteLog -success "Server Started. Exiting..."
+		ExitCheck
+	}
+}
+Function CheckServerStart {
+	if ($null -ne (Get-Process | Where-Object {$_.processname -match "palserver"})){
+		WriteLog -info -noconsole "LaunchServer: Server is currently running"
 	}
 	if ($False -eq $UpdateOnly) {
 		if (-not $Config.NormalSettingsName.EndsWith(".ini")){#add .ini to value if it wasn't specified in config.
