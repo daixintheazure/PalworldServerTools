@@ -28,7 +28,7 @@ Changes since 1.1.0 (next version edits):
 ##########################################################################################################
 param(
 	[switch]$Info,[switch]$Version,[switch]$ServerName,[switch]$ShowPlayers,[switch]$ShowPlayersNoHeader,[switch]$ShowPlayerNames,[switch]$ShowPlayerCount,[switch]$LogPlayers,[switch]$Shutdown,[int]$ShutdownTimer,$ShutdownMessage,[string]$Broadcast,[switch]$DoExit,[switch]$Save,
-	[string]$KickPlayer,[string]$BanPlayer,$ServerPath,$ThemeSettingsPath,$LaunchParameters,$HostIP,$RCONPort,$RCONPass,[switch]$UpdateOnly,[switch]$UpdateCheck,[switch]$NoUpdate,[switch]$Start,[switch]$CheckStart,[switch]$StartThemed,[switch]$TodaysTheme,[Switch]$NoLogging,[switch]$Setup,[Switch]$Backup,[switch]$debug
+	[string]$KickPlayer,[string]$BanPlayer,$ServerPath,$ThemeSettingsPath,$LaunchParameters,$HostIP,$RCONPort,$RCONPass,[switch]$UpdateOnly,[switch]$UpdateCheck,[switch]$NoUpdate,[switch]$Start,[switch]$CheckStart,[switch]$CheckStartThemed,[switch]$StartThemed,[switch]$TodaysTheme,[Switch]$NoLogging,[switch]$Setup,[Switch]$Backup,[switch]$debug
 )
 $ScriptVersion = "1.1.1"
 
@@ -476,6 +476,7 @@ Function LaunchServer {
 Function CheckServerStart {
 	if ($null -ne (Get-Process | Where-Object {$_.processname -match "palserver"})){
 		WriteLog -info -noconsole "LaunchServer: Server is currently running"
+  		ExitCheck
 	}
 	if ($False -eq $UpdateOnly) {
 		if (-not $Config.NormalSettingsName.EndsWith(".ini")){#add .ini to value if it wasn't specified in config.
@@ -487,7 +488,7 @@ Function CheckServerStart {
 				WriteLog -warning -nonewline ($Config.NormalSettingsName + " doesn't exist, copying current config to $ThemeSettingsPath" + $Config.NormalSettingsName)
 				Copy-Item "$ServerPath\Pal\Saved\Config\WindowsServer\PalWorldSettings.ini" "$ThemeSettingsPath$($Config.NormalSettingsName)" #$ServerPath\Pal\Saved\Config\WindowsServer\CustomSettings\
 		}
-		if ($True -ne $Start){
+		if ($True -ne $CheckStart){
 			WriteLog -info -noconsole "LaunchServer: "
 			WriteLog -info -nonewline "Starting Palworld Server with Theme Config"
 			$iniFiles = Get-ChildItem -Path $ThemeSettingsPath -Filter *.ini
@@ -1450,7 +1451,7 @@ if ($true -eq $Start -or $true -eq $StartThemed){
 	}
 	LaunchServer
 }
-if ($true -eq $CheckStart){
+if ($true -eq $CheckStart -or $true -eq $CheckStartThemed){
 	WriteLog -info -noconsole "Initialisation: Parameter supplied to start Server."
 	if ($true -ne $noUpdate){#update server unless it was specified not to at launch
 		WriteLog -info -noconsole "Initialisation: Checking for updates as part of launch process."
